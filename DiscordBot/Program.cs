@@ -5,20 +5,24 @@ using Discord.Commands;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 using Discord;
+using System.Configuration;
 
 namespace DiscordBot
 {
     class Program
     {
-        static void Main(string[] args) => new Program().RunBotAsync().GetAwaiter().GetResult();
-
         private DiscordSocketClient _client;
         private CommandService _commands;
         private IServiceProvider _services;
 
-        private const string _botToken = "NDcxOTQ0NDMwMzcxNDcxMzYx.DjsNjA.AuvYoskScOzpKDc-iOyNqO2CUKk";
+        private readonly string _botToken = ConfigurationManager.AppSettings["BotToken"];
 
-        public async Task RunBotAsync()
+        public static void Main(string[] args)
+        {
+            new Program().RunBotAsync().GetAwaiter().GetResult();
+        }
+
+        private async Task RunBotAsync()
         {
             _client = new DiscordSocketClient();
             _commands = new CommandService();
@@ -26,6 +30,7 @@ namespace DiscordBot
             _services = new ServiceCollection()
                 .AddSingleton(_client)
                 .AddSingleton(_commands)
+                .AddSingleton<AudioService>()
                 .BuildServiceProvider();
 
             _client.Log += Log;
@@ -46,7 +51,7 @@ namespace DiscordBot
             return Task.CompletedTask;
         }
 
-        public async Task RegisterCommandAsync()
+        private async Task RegisterCommandAsync()
         {
             _client.MessageReceived += HandleCommandAsync;
 
@@ -55,20 +60,25 @@ namespace DiscordBot
 
         private async Task HandleCommandAsync(SocketMessage arg)
         {
-            var message = arg as SocketUserMessage;
-
-            if (message is null || message.Author.IsBot) return;
-
-            int argPos = 0;
-
-            if(message.HasStringPrefix("sik!", ref argPos) || message.HasMentionPrefix(_client.CurrentUser, ref argPos))
+            try
             {
-                var context = new SocketCommandContext(_client, message);
+                if (!(arg is SocketUserMessage message) || message.Author.IsBot) return;
 
-                var result = await _commands.ExecuteAsync(context, argPos, _services);
+                int argPos = 0;
 
-                if (!result.IsSuccess)
-                    Console.WriteLine(result.ErrorReason);
+                if (message.HasStringPrefix("sik!", ref argPos) || message.HasMentionPrefix(_client.CurrentUser, ref argPos))
+                {
+                    var context = new SocketCommandContext(_client, message);
+
+                    var result = await _commands.ExecuteAsync(context, argPos, _services);
+
+                    if (!result.IsSuccess)
+                        Console.WriteLine(result.ErrorReason);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
             }
         }
     }
